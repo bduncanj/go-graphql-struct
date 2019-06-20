@@ -2,8 +2,9 @@ package gqlstruct
 
 import (
 	"fmt"
-	"github.com/graphql-go/graphql"
 	"reflect"
+
+	"github.com/graphql-go/graphql"
 )
 
 type encoder struct {
@@ -80,10 +81,10 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		tag, ok := field.Tag.Lookup("graphql")
-		if !ok {
-			// If the field is not tagged, ignore it.
-			continue
-		}
+		// if !ok {
+		// 	// If the field is not tagged, ignore it.
+		// 	continue
+		// }
 
 		objectType, ok := enc.getType(field.Type)
 		if !ok {
@@ -107,7 +108,11 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 			Type:    objectType,
 			Resolve: resolve,
 		}
-		r.AddFieldConfig(tag, gfield)
+		fieldName := field.Name
+		if len(tag) > 0 {
+			fieldName = tag
+		}
+		r.AddFieldConfig(fieldName, gfield)
 	}
 	return r, nil
 }
