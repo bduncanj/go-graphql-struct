@@ -3,6 +3,7 @@ package gqlstruct
 import (
 	"fmt"
 	"reflect"
+	"unicode"
 
 	"github.com/graphql-go/graphql"
 )
@@ -108,11 +109,22 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 			Type:    objectType,
 			Resolve: resolve,
 		}
-		fieldName := field.Name
+		fieldName := []rune(field.Name)
 		if len(tag) > 0 {
-			fieldName = tag
+			fieldName = []rune(tag)
 		}
-		r.AddFieldConfig(fieldName, gfield)
+		for i := 0; i < len(fieldName); i++ {
+			lowerCase := true
+			if (i > 0) && (len(fieldName) > i+1) {
+				// Keep only the final capital letter of the start of word
+				// i.e. ACTTest -> actTest
+				lowerCase = unicode.IsUpper(fieldName[i+1])
+			}
+			if lowerCase {
+				fieldName[i] = unicode.ToLower(fieldName[i])
+			}
+		}
+		r.AddFieldConfig(string(fieldName), gfield)
 	}
 	return r, nil
 }
