@@ -30,6 +30,35 @@ func (enc *encoder) Args(obj interface{}) (graphql.FieldConfigArgument, error) {
 	return enc.ArgsOf(t)
 }
 
+func toLowerCamelCase(input string) string {
+	fieldName := []rune(input)
+	lastUppercase := false
+
+	for i := 0; i < len(fieldName); i++ {
+		lowerCase := true
+		hasAnotherLetter := len(fieldName) > i+1
+		// The first letter will always be lower case
+		if i > 0 {
+			if hasAnotherLetter {
+				// Keep only the final capital letter of the start of word
+				// i.e. ACTTest -> actTest
+				// If the next character is upper
+				lowerCase = unicode.IsUpper(fieldName[i+1])
+			}
+			if (len(fieldName) == (i + 2)) && lastUppercase {
+				lowerCase = true
+			}
+		}
+		lastUppercase = unicode.IsUpper(fieldName[i])
+
+		if lowerCase {
+			fieldName[i] = unicode.ToLower(fieldName[i])
+		}
+
+	}
+	return string(fieldName)
+}
+
 // Struct returns a `*graphql.Object` with the description extracted from the
 // obj passed.
 //
@@ -113,18 +142,8 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 		if len(tag) > 0 {
 			fieldName = []rune(tag)
 		}
-		for i := 0; i < len(fieldName); i++ {
-			lowerCase := true
-			if (i > 0) && (len(fieldName) > i+1) {
-				// Keep only the final capital letter of the start of word
-				// i.e. ACTTest -> actTest
-				lowerCase = unicode.IsUpper(fieldName[i+1])
-			}
-			if lowerCase {
-				fieldName[i] = unicode.ToLower(fieldName[i])
-			}
-		}
-		r.AddFieldConfig(string(fieldName), gfield)
+		fieldNameS := toLowerCamelCase(string(fieldName))
+		r.AddFieldConfig(fieldNameS, gfield)
 	}
 	return r, nil
 }
