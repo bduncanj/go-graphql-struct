@@ -212,10 +212,10 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		tag, ok := field.Tag.Lookup("graphql")
-		if !ok {
-			// If the field is not tagged, ignore it.
-			continue
-		}
+		// if !ok {
+		// 	// If the field is not tagged, ignore it.
+		// 	continue
+		// }
 
 		objectType, ok := enc.getType(field.Type)
 		if !ok {
