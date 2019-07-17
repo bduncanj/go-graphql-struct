@@ -236,7 +236,14 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 		graphQLArgument := &graphql.ArgumentConfig{
 			Type: objectType,
 		}
-		r[tag] = graphQLArgument
+
+		fieldName := []rune(field.Name)
+		if len(tag) > 0 {
+			fieldName = []rune(tag)
+		}
+		fieldNameS := toLowerCamelCase(string(fieldName))
+
+		r[fieldNameS] = graphQLArgument
 	}
 
 	return r, nil
@@ -266,6 +273,15 @@ func (enc *encoder) registerType(t reflect.Type, r graphql.Type) {
 
 func Struct(obj interface{}) *graphql.Object {
 	r, err := defaultEncoder.Struct(obj)
+	if err != nil {
+		panic(err.Error())
+	}
+	return r
+}
+
+// Args Obtain the arguments property of a mutation object
+func Args(obj interface{}) graphql.FieldConfigArgument {
+	r, err := defaultEncoder.Args(obj)
 	if err != nil {
 		panic(err.Error())
 	}
