@@ -197,6 +197,58 @@ func (enc *encoder) ArrayOf(t reflect.Type, options ...Option) (graphql.Type, er
 	return graphql.NewList(typeBuilt), nil
 }
 
+func (enc *encoder) InputObjectFieldMap(t reflect.Type) (graphql.InputObjectConfigFieldMap, error) {
+	r := graphql.InputObjectConfigFieldMap{}
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	if t.Kind() != reflect.Struct {
+		return r, fmt.Errorf("cannot build args from a non struct")
+	}
+
+	// Goes field by field of the object.
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag, ok := field.Tag.Lookup("graphql")
+		// if !ok {
+		// 	// If the field is not tagged, ignore it.
+		// 	continue
+		// }
+
+		objectType, ok := enc.getType(field.Type)
+		if !ok {
+			ot, err := enc.buildFieldType(field.Type)
+			if err != nil {
+				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
+			}
+			objectType = ot
+			enc.registerType(field.Type, ot)
+		}
+
+		// If the tag starts with "!" it is a NonNull type.
+		if len(tag) > 0 && tag[0] == '!' {
+			objectType = graphql.NewNonNull(objectType)
+			tag = tag[1:]
+		}
+
+		inputField := &graphql.InputObjectFieldConfig{
+			Type: objectType,
+		}
+
+		fieldName := []rune(field.Name)
+		if len(tag) > 0 {
+			fieldName = []rune(tag)
+		}
+		fieldNameS := toLowerCamelCase(string(fieldName))
+
+		r[fieldNameS] = inputField
+	}
+
+	return r, nil
+}
+
 func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) {
 	r := graphql.FieldConfigArgument{}
 
@@ -277,6 +329,20 @@ func Struct(obj interface{}) *graphql.Object {
 		panic(err.Error())
 	}
 	return r
+}
+
+func InputObject(name string, obj interface{}) *graphql.InputObject {
+	t := reflect.TypeOf(obj)
+	r, err := defaultEncoder.InputObjectFieldMap(t)
+	if err != nil {
+		panic(err.Error())
+	}
+	return graphql.NewInputObject(
+		graphql.InputObjectConfig{
+			Name:   name,
+			Fields: r,
+		},
+	)
 }
 
 // Args Obtain the arguments property of a mutation object
