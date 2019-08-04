@@ -1,9 +1,10 @@
 package gqlstruct
 
 import (
-	"github.com/graphql-go/graphql"
 	"reflect"
 	"time"
+
+	"github.com/graphql-go/graphql"
 )
 
 // GraphqlTyped is the interface implemented by types that will provide a
@@ -36,7 +37,7 @@ func (enc *encoder) buildFieldType(fieldType reflect.Type) (graphql.Type, error)
 	}
 
 	if fieldType.Implements(graphqlTypedType) {
-		vStruct := reflect.New(fieldType.Elem())
+		vStruct := reflect.New(fieldType)
 		return vStruct.Interface().(GraphqlTyped).GraphqlType(), nil
 	}
 
