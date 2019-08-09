@@ -40,18 +40,23 @@ func getIsUpperCase(fieldName []rune, i int) bool {
 	lastLetter := (len(fieldName) == i+1)
 	nextToLastLetter := (len(fieldName) == (i + 2))
 
+	// Transition A: Previous lower, this upper
+	wordBoundaryA := unicode.IsLower(fieldName[i-1]) && unicode.IsUpper(fieldName[i])
+	if lastLetter && wordBoundaryA {
+		return true
+	}
+
+	// Handle single 's' pluralization after this letter
+	if nextToLastLetter && (fieldName[i+1] == 's') {
+		return false
+	}
+
 	if !lastLetter {
 
-		// Feds > feds
-		if nextToLastLetter && (fieldName[i+1] == 's') {
-			return false
-		}
-		// Transition A: This letter upper, next is lower
-		wordBoundaryA := unicode.IsUpper(fieldName[i]) && unicode.IsLower(fieldName[i+1])
-		// Transition B: Previous lower, this upper
-		wordBoundaryB := unicode.IsLower(fieldName[i-1]) && unicode.IsUpper(fieldName[i])
+		// Transition B: This letter upper, next is lower
+		wordBoundaryB := unicode.IsUpper(fieldName[i]) && unicode.IsLower(fieldName[i+1])
 
-		if wordBoundaryA || wordBoundaryB {
+		if wordBoundaryB || wordBoundaryA {
 			return true
 		}
 	}
