@@ -30,33 +30,51 @@ func (enc *encoder) Args(obj interface{}) (graphql.FieldConfigArgument, error) {
 	return enc.ArgsOf(t)
 }
 
-func toLowerCamelCase(input string) string {
-	fieldName := []rune(input)
-	lastUppercase := false
+func getIsUpperCase(fieldName []rune, i int) bool {
+	upperCase := false
 
-	for i := 0; i < len(fieldName); i++ {
-		lowerCase := true
-		hasAnotherLetter := len(fieldName) > i+1
-		// The first letter will always be lower case
-		if i > 0 {
-			if hasAnotherLetter {
-				// Keep only the final capital letter of the start of word
-				// i.e. ACTTest -> actTest
-				// If the next character is upper
-				lowerCase = unicode.IsUpper(fieldName[i+1])
-			}
-			if (len(fieldName) == (i + 2)) && lastUppercase {
-				lowerCase = true
-			}
+	if i == 0 {
+		return false
+	}
+
+	lastLetter := (len(fieldName) == i+1)
+	nextToLastLetter := (len(fieldName) == (i + 2))
+
+	if !lastLetter {
+
+		// Feds > feds
+		if nextToLastLetter && (fieldName[i+1] == 's') {
+			return false
 		}
-		lastUppercase = unicode.IsUpper(fieldName[i])
+		// Transition A: This letter upper, next is lower
+		wordBoundaryA := unicode.IsUpper(fieldName[i]) && unicode.IsLower(fieldName[i+1])
+		// Transition B: Previous lower, this upper
+		wordBoundaryB := unicode.IsLower(fieldName[i-1]) && unicode.IsUpper(fieldName[i])
 
-		if lowerCase {
-			fieldName[i] = unicode.ToLower(fieldName[i])
+		if wordBoundaryA || wordBoundaryB {
+			return true
+		}
+	}
+	return upperCase
+}
+
+func toLowerCamelCase(input string) string {
+
+	inFieldName := []rune(input)
+	outFieldName := make([]rune, len(inFieldName))
+
+	for i := 0; i < len(inFieldName); i++ {
+		// Be default make everything lower case
+		upperCase := getIsUpperCase(inFieldName, i)
+
+		if upperCase {
+			outFieldName[i] = unicode.ToUpper(inFieldName[i])
+		} else {
+			outFieldName[i] = unicode.ToLower(inFieldName[i])
 		}
 
 	}
-	return string(fieldName)
+	return string(outFieldName)
 }
 
 // Struct returns a `*graphql.Object` with the description extracted from the
