@@ -13,6 +13,11 @@ Usually, building the schema is a one time task and it is done
 statically. So, this library does not degrade the performance, not even
 a little, but in that one-time initialization.
 
+## Supported tags
+
+* `desc` This will become the GraphQL "Description" field on structs.
+* `dep` This will become the GraphQL "DeprecatedReason" field on structs.
+
 ## Usage
 
 Check the examples in the `/examples` folder.

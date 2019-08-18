@@ -161,6 +161,15 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 			Type:    objectType,
 			Resolve: resolve,
 		}
+		desc, ok := field.Tag.Lookup("desc")
+		if ok {
+			gfield.Description = desc
+		}
+		dep, ok := field.Tag.Lookup("dep")
+		if ok {
+			gfield.DeprecationReason = dep
+		}
+
 		fieldName := []rune(field.Name)
 		if len(tag) > 0 {
 			fieldName = []rune(tag)
