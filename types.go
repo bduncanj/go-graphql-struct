@@ -22,14 +22,8 @@ var (
 )
 
 func (enc *encoder) buildFieldType(fieldType reflect.Type, isInput bool) (graphql.Type, error) {
-	if isInput {
-		if r, ok := enc.getInputType(fieldType); ok {
-			return r, nil
-		}
-	} else {
-		if r, ok := enc.getType(fieldType); ok {
-			return r, nil
-		}
+	if r, ok := enc.getType(fieldType, isInput); ok {
+		return r, nil
 	}
 
 	if fieldType.Kind() == reflect.Struct && fieldType != timeType {

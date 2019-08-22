@@ -9,14 +9,12 @@ import (
 )
 
 type encoder struct {
-	types      map[string]graphql.Type
-	inputTypes map[string]graphql.Type
+	types map[string]graphql.Type
 }
 
 func NewEncoder() *encoder {
 	return &encoder{
-		types:      make(map[string]graphql.Type),
-		inputTypes: make(map[string]graphql.Type),
+		types: make(map[string]graphql.Type),
 	}
 }
 
@@ -100,7 +98,7 @@ func toLowerCamelCase(input string) string {
 //
 // * fieldname: The name of the field.
 func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object, error) {
-	if r, ok := enc.getType(t); ok {
+	if r, ok := enc.getType(t, false); ok {
 		if d, ok := r.(*graphql.Object); ok {
 			return d, nil
 		}
@@ -126,7 +124,7 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 	}
 
 	r := graphql.NewObject(objCfg)
-	enc.registerType(t, r)
+	enc.registerType(t, r, false)
 
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -141,14 +139,14 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 		// 	continue
 		// }
 
-		objectType, ok := enc.getType(field.Type)
+		objectType, ok := enc.getType(field.Type, false)
 		if !ok {
 			ot, err := enc.buildFieldType(field.Type, false)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
 			objectType = ot
-			enc.registerType(field.Type, ot)
+			enc.registerType(field.Type, ot, false)
 		}
 
 		// If the tag starts with "!" it is a NonNull type.
@@ -183,7 +181,7 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 }
 
 func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.InputObject, error) {
-	if r, ok := enc.getInputType(t); ok {
+	if r, ok := enc.getType(t, true); ok {
 		if d, ok := r.(*graphql.InputObject); ok {
 			return d, nil
 		}
@@ -209,7 +207,7 @@ func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.I
 	}
 
 	r := graphql.NewInputObject(objCfg)
-	enc.registerInputType(t, r)
+	enc.registerType(t, r, true)
 
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()
@@ -220,14 +218,14 @@ func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.I
 		field := t.Field(i)
 		tag, ok := field.Tag.Lookup("graphql")
 
-		objectType, ok := enc.getInputType(field.Type)
+		objectType, ok := enc.getType(field.Type, true)
 		if !ok {
 			ot, err := enc.buildFieldType(field.Type, true)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
 			objectType = ot
-			enc.registerInputType(field.Type, ot)
+			enc.registerType(field.Type, ot, true)
 		}
 
 		// If the tag starts with "!" it is a NonNull type.
@@ -283,7 +281,7 @@ func (enc *encoder) ArrayOf(t reflect.Type, options ...Option) (graphql.Type, er
 		t = t.Elem()
 	}
 	var typeBuilt graphql.Type
-	if cachedType, ok := enc.getType(t); ok {
+	if cachedType, ok := enc.getType(t, false); ok {
 		return graphql.NewList(cachedType), nil
 	}
 	if t.Kind() == reflect.Struct {
@@ -299,7 +297,7 @@ func (enc *encoder) ArrayOf(t reflect.Type, options ...Option) (graphql.Type, er
 		}
 		typeBuilt = ttt
 	}
-	enc.registerType(t, typeBuilt)
+	enc.registerType(t, typeBuilt, false)
 	return graphql.NewList(typeBuilt), nil
 }
 
@@ -319,14 +317,14 @@ func (enc *encoder) InputObjectFieldMap(t reflect.Type) (graphql.InputObjectConf
 		field := t.Field(i)
 		tag, ok := field.Tag.Lookup("graphql")
 
-		objectType, ok := enc.getInputType(field.Type)
+		objectType, ok := enc.getType(field.Type, true)
 		if !ok {
 			ot, err := enc.buildFieldType(field.Type, true)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
 			objectType = ot
-			enc.registerInputType(field.Type, ot)
+			enc.registerType(field.Type, ot, true)
 		}
 
 		// If the tag starts with "!" it is a NonNull type.
@@ -371,14 +369,14 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 		// 	continue
 		// }
 
-		objectType, ok := enc.getType(field.Type)
+		objectType, ok := enc.getType(field.Type, true)
 		if !ok {
-			ot, err := enc.buildFieldType(field.Type, false)
+			ot, err := enc.buildFieldType(field.Type, true)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
 			objectType = ot
-			enc.registerType(field.Type, ot)
+			enc.registerType(field.Type, ot, true)
 		}
 
 		// If the tag starts with "!" it is a NonNull type.
@@ -403,47 +401,37 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 	return r, nil
 }
 
-func (enc *encoder) getType(t reflect.Type) (graphql.Type, bool) {
+func (enc *encoder) getType(t reflect.Type, isInput bool) (graphql.Type, bool) {
 	name := t.Name()
+	isStruct := t.Kind() == reflect.Struct
 	if t.Kind() == reflect.Ptr {
 		name = t.Elem().Name()
+		isStruct = t.Elem().Kind() == reflect.Struct
 	}
 	if len(name) > 0 {
+		if isStruct && isInput {
+			gt, ok := enc.types[name+"Input"]
+			return gt, ok
+		}
 		gt, ok := enc.types[name]
 		return gt, ok
 	}
 	return nil, false
 }
 
-func (enc *encoder) getInputType(t reflect.Type) (graphql.Type, bool) {
+func (enc *encoder) registerType(t reflect.Type, r graphql.Type, isInput bool) {
 	name := t.Name()
+	isStruct := t.Kind() == reflect.Struct
 	if t.Kind() == reflect.Ptr {
 		name = t.Elem().Name()
+		isStruct = t.Elem().Kind() == reflect.Struct
 	}
 	if len(name) > 0 {
-		gt, ok := enc.inputTypes[name]
-		return gt, ok
-	}
-	return nil, false
-}
-
-func (enc *encoder) registerType(t reflect.Type, r graphql.Type) {
-	name := t.Name()
-	if t.Kind() == reflect.Ptr {
-		name = t.Elem().Name()
-	}
-	if len(name) > 0 {
-		enc.types[name] = r
-	}
-}
-
-func (enc *encoder) registerInputType(t reflect.Type, r graphql.Type) {
-	name := t.Name()
-	if t.Kind() == reflect.Ptr {
-		name = t.Elem().Name()
-	}
-	if len(name) > 0 {
-		enc.inputTypes[name] = r
+		if isStruct && isInput {
+			enc.types[name+"Input"] = r
+		} else {
+			enc.types[name] = r
+		}
 	}
 }
 
