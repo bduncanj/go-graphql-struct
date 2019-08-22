@@ -193,9 +193,14 @@ func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.I
 		name = t.Elem().Name()
 	}
 
+	f, err := enc.InputObjectFieldMap(t)
+	if err != nil {
+		return nil, err
+	}
+
 	objCfg := graphql.InputObjectConfig{
 		Name:   name + "Input",
-		Fields: graphql.InputObjectFieldMap{},
+		Fields: f,
 	}
 
 	// Apply options
@@ -208,47 +213,6 @@ func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.I
 
 	r := graphql.NewInputObject(objCfg)
 	enc.registerType(t, r, true)
-
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	// Goes field by field of the object.
-
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		tag, ok := field.Tag.Lookup("graphql")
-
-		objectType, ok := enc.getType(field.Type, true)
-		if !ok {
-			ot, err := enc.buildFieldType(field.Type, true)
-			if err != nil {
-				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
-			}
-			objectType = ot
-			enc.registerType(field.Type, ot, true)
-		}
-
-		// If the tag starts with "!" it is a NonNull type.
-		if len(tag) > 0 && tag[0] == '!' {
-			objectType = graphql.NewNonNull(objectType)
-			tag = tag[1:]
-		}
-
-		gfield := &graphql.InputObjectFieldConfig{
-			Type: objectType,
-		}
-		desc, ok := field.Tag.Lookup("desc")
-		if ok {
-			gfield.Description = desc
-		}
-
-		fieldName := []rune(field.Name)
-		if len(tag) > 0 {
-			fieldName = []rune(tag)
-		}
-		fieldNameS := toLowerCamelCase(string(fieldName))
-		r.AddFieldConfig(fieldNameS, gfield)
-	}
 	return r, nil
 }
 
