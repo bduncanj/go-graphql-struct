@@ -15,7 +15,8 @@ type encoder struct {
 
 func NewEncoder() *encoder {
 	return &encoder{
-		types: make(map[string]graphql.Type),
+		types:      make(map[string]graphql.Type),
+		inputTypes: make(map[string]graphql.Type),
 	}
 }
 
