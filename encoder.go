@@ -9,7 +9,8 @@ import (
 )
 
 type encoder struct {
-	types map[string]graphql.Type
+	types      map[string]graphql.Type
+	inputTypes map[string]graphql.Type
 }
 
 func NewEncoder() *encoder {
@@ -141,7 +142,7 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 
 		objectType, ok := enc.getType(field.Type)
 		if !ok {
-			ot, err := enc.buildFieldType(field.Type)
+			ot, err := enc.buildFieldType(field.Type, false)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
@@ -168,6 +169,78 @@ func (enc *encoder) StructOf(t reflect.Type, options ...Option) (*graphql.Object
 		dep, ok := field.Tag.Lookup("dep")
 		if ok {
 			gfield.DeprecationReason = dep
+		}
+
+		fieldName := []rune(field.Name)
+		if len(tag) > 0 {
+			fieldName = []rune(tag)
+		}
+		fieldNameS := toLowerCamelCase(string(fieldName))
+		r.AddFieldConfig(fieldNameS, gfield)
+	}
+	return r, nil
+}
+
+func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.InputObject, error) {
+	if r, ok := enc.getInputType(t); ok {
+		if d, ok := r.(*graphql.InputObject); ok {
+			return d, nil
+		}
+		return nil, fmt.Errorf("%s is not an graphql.Object", r)
+	}
+
+	name := t.Name()
+	if t.Kind() == reflect.Ptr {
+		name = t.Elem().Name()
+	}
+
+	objCfg := graphql.InputObjectConfig{
+		Name:   name,
+		Fields: graphql.InputObjectFieldMap{},
+	}
+
+	// Apply options
+	for _, opt := range options {
+		err := opt.Apply(&objCfg)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	r := graphql.NewInputObject(objCfg)
+	enc.registerInputType(t, r)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	// Goes field by field of the object.
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag, ok := field.Tag.Lookup("graphql")
+
+		objectType, ok := enc.getInputType(field.Type)
+		if !ok {
+			ot, err := enc.buildFieldType(field.Type, true)
+			if err != nil {
+				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
+			}
+			objectType = ot
+			enc.registerInputType(field.Type, ot)
+		}
+
+		// If the tag starts with "!" it is a NonNull type.
+		if len(tag) > 0 && tag[0] == '!' {
+			objectType = graphql.NewNonNull(objectType)
+			tag = tag[1:]
+		}
+
+		gfield := &graphql.InputObjectFieldConfig{
+			Type: objectType,
+		}
+		desc, ok := field.Tag.Lookup("desc")
+		if ok {
+			gfield.Description = desc
 		}
 
 		fieldName := []rune(field.Name)
@@ -219,7 +292,7 @@ func (enc *encoder) ArrayOf(t reflect.Type, options ...Option) (graphql.Type, er
 		}
 		typeBuilt = bt
 	} else {
-		ttt, err := enc.buildFieldType(t)
+		ttt, err := enc.buildFieldType(t, false)
 		if err != nil {
 			return nil, err
 		}
@@ -244,19 +317,15 @@ func (enc *encoder) InputObjectFieldMap(t reflect.Type) (graphql.InputObjectConf
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		tag, ok := field.Tag.Lookup("graphql")
-		// if !ok {
-		// 	// If the field is not tagged, ignore it.
-		// 	continue
-		// }
 
-		objectType, ok := enc.getType(field.Type)
+		objectType, ok := enc.getInputType(field.Type)
 		if !ok {
-			ot, err := enc.buildFieldType(field.Type)
+			ot, err := enc.buildFieldType(field.Type, true)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
 			objectType = ot
-			enc.registerType(field.Type, ot)
+			enc.registerInputType(field.Type, ot)
 		}
 
 		// If the tag starts with "!" it is a NonNull type.
@@ -303,7 +372,7 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 
 		objectType, ok := enc.getType(field.Type)
 		if !ok {
-			ot, err := enc.buildFieldType(field.Type)
+			ot, err := enc.buildFieldType(field.Type, false)
 			if err != nil {
 				return nil, NewErrTypeNotRecognizedWithStruct(err, t, field)
 			}
@@ -345,6 +414,18 @@ func (enc *encoder) getType(t reflect.Type) (graphql.Type, bool) {
 	return nil, false
 }
 
+func (enc *encoder) getInputType(t reflect.Type) (graphql.Type, bool) {
+	name := t.Name()
+	if t.Kind() == reflect.Ptr {
+		name = t.Elem().Name()
+	}
+	if len(name) > 0 {
+		gt, ok := enc.inputTypes[name]
+		return gt, ok
+	}
+	return nil, false
+}
+
 func (enc *encoder) registerType(t reflect.Type, r graphql.Type) {
 	name := t.Name()
 	if t.Kind() == reflect.Ptr {
@@ -352,6 +433,16 @@ func (enc *encoder) registerType(t reflect.Type, r graphql.Type) {
 	}
 	if len(name) > 0 {
 		enc.types[name] = r
+	}
+}
+
+func (enc *encoder) registerInputType(t reflect.Type, r graphql.Type) {
+	name := t.Name()
+	if t.Kind() == reflect.Ptr {
+		name = t.Elem().Name()
+	}
+	if len(name) > 0 {
+		enc.inputTypes[name] = r
 	}
 }
 

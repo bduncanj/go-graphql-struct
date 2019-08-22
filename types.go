@@ -21,9 +21,15 @@ var (
 	timeType            = reflect.TypeOf(time.Time{})
 )
 
-func (enc *encoder) buildFieldType(fieldType reflect.Type) (graphql.Type, error) {
-	if r, ok := enc.getType(fieldType); ok {
-		return r, nil
+func (enc *encoder) buildFieldType(fieldType reflect.Type, isInput bool) (graphql.Type, error) {
+	if isInput {
+		if r, ok := enc.getInputType(fieldType); ok {
+			return r, nil
+		}
+	} else {
+		if r, ok := enc.getType(fieldType); ok {
+			return r, nil
+		}
 	}
 
 	if fieldType.Kind() == reflect.Struct && fieldType != timeType {
@@ -54,6 +60,9 @@ func (enc *encoder) buildFieldType(fieldType reflect.Type) (graphql.Type, error)
 
 	switch fieldType.Kind() {
 	case reflect.Struct:
+		if isInput {
+			return enc.InputStructOf(fieldType)
+		}
 		return enc.StructOf(fieldType)
 	case reflect.Array, reflect.Slice:
 		return enc.ArrayOf(fieldType.Elem())
