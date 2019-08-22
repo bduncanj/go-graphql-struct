@@ -9,14 +9,14 @@ import (
 )
 
 type encoder struct {
-	types map[string]graphql.Type
-	// inputTypes map[string]graphql.Type
+	types      map[string]graphql.Type
+	inputTypes map[string]graphql.Type
 }
 
 func NewEncoder() *encoder {
 	return &encoder{
-		types: make(map[string]graphql.Type),
-		// inputTypes: make(map[string]graphql.Type),
+		types:      make(map[string]graphql.Type),
+		inputTypes: make(map[string]graphql.Type),
 	}
 }
 
@@ -196,7 +196,7 @@ func (enc *encoder) InputStructOf(t reflect.Type, options ...Option) (*graphql.I
 	}
 
 	objCfg := graphql.InputObjectConfig{
-		Name:   name,
+		Name:   name + "Input",
 		Fields: graphql.InputObjectFieldMap{},
 	}
 
@@ -421,8 +421,7 @@ func (enc *encoder) getInputType(t reflect.Type) (graphql.Type, bool) {
 		name = t.Elem().Name()
 	}
 	if len(name) > 0 {
-		name = name + "Input"
-		gt, ok := enc.types[name]
+		gt, ok := enc.inputTypes[name]
 		return gt, ok
 	}
 	return nil, false
@@ -444,8 +443,7 @@ func (enc *encoder) registerInputType(t reflect.Type, r graphql.Type) {
 		name = t.Elem().Name()
 	}
 	if len(name) > 0 {
-		name = name + "Input"
-		enc.types[name] = r
+		enc.inputTypes[name] = r
 	}
 }
 
