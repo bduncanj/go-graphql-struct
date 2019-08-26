@@ -59,6 +59,9 @@ func (enc *encoder) buildFieldType(fieldType reflect.Type, isInput bool) (graphq
 		}
 		return enc.StructOf(fieldType)
 	case reflect.Array, reflect.Slice:
+		if isInput {
+			return enc.InputArrayOf(fieldType.Elem())
+		}
 		return enc.ArrayOf(fieldType.Elem())
 	case reflect.Bool:
 		return graphql.Boolean, nil

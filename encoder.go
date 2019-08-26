@@ -239,6 +239,33 @@ func (enc *encoder) Field(t interface{}, options ...Option) (graphql.Field, erro
 	return enc.FieldOf(reflect.TypeOf(t), options...)
 }
 
+// InputArrayOf Use this to encode an array of structs which will be used as a mutation argument
+func (enc *encoder) InputArrayOf(t reflect.Type, options ...Option) (graphql.Type, error) {
+	if t.Kind() == reflect.Ptr {
+		// If pointer, get the Type of the pointer
+		t = t.Elem()
+	}
+	var typeBuilt graphql.Type
+	if cachedType, ok := enc.getType(t, true); ok {
+		return graphql.NewList(cachedType), nil
+	}
+	if t.Kind() == reflect.Struct {
+		bt, err := enc.InputStructOf(t, options...)
+		if err != nil {
+			return nil, err
+		}
+		typeBuilt = bt
+	} else {
+		ttt, err := enc.buildFieldType(t, true)
+		if err != nil {
+			return nil, err
+		}
+		typeBuilt = ttt
+	}
+	enc.registerType(t, typeBuilt, true)
+	return graphql.NewList(typeBuilt), nil
+}
+
 func (enc *encoder) ArrayOf(t reflect.Type, options ...Option) (graphql.Type, error) {
 	if t.Kind() == reflect.Ptr {
 		// If pointer, get the Type of the pointer
