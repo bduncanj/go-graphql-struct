@@ -395,12 +395,14 @@ func (enc *encoder) ArgsOf(t reflect.Type) (graphql.FieldConfigArgument, error) 
 func (enc *encoder) getType(t reflect.Type, isInput bool) (graphql.Type, bool) {
 	name := t.Name()
 	isStruct := t.Kind() == reflect.Struct
+	isArray := t.Kind() == reflect.Slice
 	if t.Kind() == reflect.Ptr {
 		name = t.Elem().Name()
 		isStruct = t.Elem().Kind() == reflect.Struct
+		isArray = t.Elem().Kind() == reflect.Slice
 	}
 	if len(name) > 0 {
-		if isStruct && isInput {
+		if (isArray || isStruct) && isInput {
 			gt, ok := enc.types[name+"Input"]
 			return gt, ok
 		}
