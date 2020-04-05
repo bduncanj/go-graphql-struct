@@ -37,6 +37,9 @@ func (enc *encoder) buildFieldType(fieldType reflect.Type, isInput bool) (graphq
 	}
 
 	if fieldType.Implements(graphqlTypedType) {
+		if fieldType.Kind() == reflect.Ptr {
+			fieldType = fieldType.Elem()
+		}
 		vStruct := reflect.New(fieldType)
 		return vStruct.Interface().(GraphqlTyped).GraphqlType(), nil
 	}
